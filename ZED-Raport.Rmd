@@ -1,0 +1,215 @@
+---
+title: "Zaawansowana Esploracja Danych - Raport"
+author: "Arkadiusz Rusin"
+date: "21 listopada 2015"
+output: html_document
+---
+
+# Spis treści:
+
+```{r, LadowanieBibliotek}
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ggExtra)
+```
+
+```{r, echo=TRUE, PowtarzalnoscWynikow}
+set.seed(23)
+```
+
+```{r, echo=TRUE, cache=TRUE, LadowanieDanych}
+
+dane <- read.table(file = "all_summary.txt", 
+                   header = FALSE,
+                   sep = ";",
+                   dec = ".",
+                   fill = FALSE, #czy usupełniać kolumny
+                   col.names = strsplit(readLines("all_summary.txt", n = 1), ";")[[1]], 
+                   skip = 1,
+                   na.strings = c('NAN'),
+                   blank.lines.skip = TRUE, #Opóść linie puste
+                   stringsAsFactors = TRUE
+                   )
+
+```
+
+```{r, echo=TRUE, cache=TRUE, CzyszczenieWartosciPustych}
+dane <- dane %>% 
+  replace(is.na(.), 0)
+```
+
+```{r, echo=TRUE, cache=TRUE, CzyszczenieDanych}
+dane <- dane %>% 
+  filter(!is.na(res_name), 
+         !res_name %in% c('DA','DC','DT','DU','DG','DI','UNK','UNX','UNL','PR','PD','Y1','EU','N','15P','UQ','PX4','NAN')) 
+```
+
+```{r, echo=TRUE, cache=TRUE, WartosciUnikatowe}
+dane <- dane %>% 
+  distinct(pdb_code, res_name)
+```
+
+
+```{r, echo=TRUE, cache=TRUE, PodsumowanieOgolne}
+summary(dane)
+```
+
+***
+
+Po ogólnej analizie danych, można zauważyć, że pewne kolumny zawierają stałe wartości:
+
+* **wartość 0 przyjmują:** `local_BAa`, `local_NPa`, `local_Ra`, `local_RGa`, `local_SRGa`, `local_CCSa`, `local_CCPa`, `local_ZOa`, `ocal_ZDa`, `local_ZD_minus_a`, `local_ZD_plus_a`
+
+* **Wartość *'DELFWT'* przyjmuje:** `fo_col`
+
+* **Wartość *'PHDELWT'* przyjmuje:** `fc_col`
+
+* **Wartość 0 przyjmuje:** `weight_col`
+
+* **Wartość 0.2 przyjmuje:** `grid_space`
+
+* **Wartość 1.9 przyjmuje:** `solvent_radius`
+
+* **Wartość 1.4 przyjmuje:** `solvent_opening_radius`
+
+* **Wartość 2 przyjmuje:** `resolution_max_limit`
+
+* **Wartość 2.5 przyjmuje:** `part_step_FoFc_std_min`
+
+* **Wartość 7.1 przyjmuje:** `part_step_FoFc_std_max`
+
+* **Wartość 0.5 przyjmuje:** `part_step_FoFc_std_step`
+
+***
+
+Dlatego do dalszej analizy danych, nie bedziemy wykorzystywać wymienionych kolumn
+
+```{r, echo=TRUE, cache=TRUE, CzyszczenieDanych2}
+dane <- dane %>%
+  select(-(local_BAa:local_ZD_plus_a), -(fo_col:resolution_max_limit), -(part_step_FoFc_std_min:part_step_FoFc_std_step))
+```
+
+
+***
+
+W zbiorze danych znajdują się kolumny, których wartości są obliczane na podstawie całego pliku PDB, a nie tylko na podstawie ligandu:
+
+* `TwoFoFc_mean`, `TwoFoFc_std`, `TwoFoFc_square_std`, `TwoFoFc_min`, `TwoFoFc_max`
+
+* `Fo_mean`, `Fo_std`, `Fo_square_std`, `Fo_min`, `Fo_max`
+
+* `FoFc_mean`, `FoFc_std`, `FoFc_square_std`, `FoFc_min`, `FoFc_max`
+
+* `Fc_mean`, `Fc_std`, `Fc_square_std`, `Fc_min`, `Fc_max`
+
+* `resolution`
+
+* `TwoFoFc_bulk_mean`, `TwoFoFc_bulk_std`, `TwoFoFc_void_mean`, `TwoFoFc_void_std`, `TwoFoFc_modeled_mean`, `TwoFoFc_modeled_std`
+
+* `Fo_bulk_mean`, `Fo_bulk_std`, `Fo_void_mean`, `Fo_void_std`, `Fo_modeled_mean`, `Fo_modeled_std`
+
+* `Fc_bulk_mean`, `Fc_bulk_std`, `Fc_void_mean`, `Fc_void_std`, `Fc_modeled_mean`, `Fc_modeled_std`
+
+* `FoFc_bulk_mean`, `FoFc_bulk_std`, `FoFc_void_mean`, `FoFc_void_std`, `FoFc_modeled_mean`, `FoFc_modeled_std`
+
+* `TwoFoFc_void_fit_binormal_mean1`, `TwoFoFc_void_fit_binormal_std1`, `TwoFoFc_void_fit_binormal_mean2`, `TwoFoFc_void_fit_binormal_std2`, `TwoFoFc_void_fit_binormal_scale`, `TwoFoFc_solvent_fit_normal_mean`, `TwoFoFc_solvent_fit_normal_std`
+
+***
+
+Do dalszej analizy, nie bedziemy wykorzystywać kolumn wymienionych wyżej
+
+```{r, echo=TRUE, cache=TRUE, CzyszczenieDanych3}
+dane <- dane %>%
+  select(-(TwoFoFc_mean:Fc_max), -resolution, -(TwoFoFc_bulk_mean:TwoFoFc_solvent_fit_normal_std))
+```
+
+***
+
+## 8. Określenie ile przykładów ma każda z klas `res_name`
+
+
+```{r, echo=TRUE, PodsumowanieKlasPart1}
+podsumowanie <- dane %>%
+  group_by(res_name) %>%
+  summarise(n=n()) #Podliczenie
+```
+
+Liczba wszystkich klas `res_name` wynosi: 
+
+```{r, echo=FALSE, PodsumowanieKlasPart2}
+kable(count(podsumowanie))
+```
+
+Wykres przedstawiający 20 najliczniejszych przykładów z klasy `res_name`
+
+```{r, echo=TRUE, PodsumowanieKlasPart3}
+podsumowanie <- podsumowanie %>%
+  arrange(desc(n)) %>%
+  slice(1:20)
+
+podsumowanie$res_name <- factor(podsumowanie$res_name, levels=unique(podsumowanie$res_name))
+
+ggplot(podsumowanie , aes(x = res_name, y = n, order = desc(n))) + 
+  geom_bar(stat="identity") + 
+  theme_bw()
+
+```
+
+```{r, echo=TRUE, cache=TRUE, Korelacja}
+dane_obliczenia <- dane %>%
+  select(-(title:chain_id), -local_parts, -local_min, -part_00_blob_parts)
+
+#cor(head(dane_obliczenia))
+```
+
+##Rozkłady
+
+```{r, echo=TRUE, Rozklad}
+rozk <- stack(dane %>% select(local_res_atom_non_h_count, local_res_atom_non_h_electron_sum))
+
+ggplot(rozk, aes(x = values)) + geom_density(aes(group=ind, colour=ind, fill=ind), alpha=0.3)
+
+```
+
+## 10. Co to bedzie;>?
+
+```{r, echo=TRUE, Rozklad2}
+
+d2d <- ggplot(dane, 
+  aes(x = local_res_atom_non_h_electron_sum, y = local_res_atom_non_h_count)) + 
+  stat_density2d(geom="tile", aes(fill = ..density..), contour = FALSE) + 
+    coord_cartesian(xlim = c(0,650), ylim = c(0,100)) +
+  scale_x_continuous(breaks=seq(100,600,100)) +
+  scale_y_continuous(breaks=seq(20,100,20)) +
+  theme(legend.position="none", axis.title.x = element_blank(), axis.title.y = element_blank())
+
+ggExtra::ggMarginal(
+  d2d,
+  type = 'histogram',
+  margins = 'both',
+  size = 5,
+  col = 'red',
+  fill = 'red',
+  binwidth = 5
+)
+```
+
+## 11. Tabelę pokazującą 10 klas z największą niezgodnością liczby atomów (local_res_atom_non_h_count vs dict_atom_non_h_count) i tabelę pokazującą 10 klas z największą niezgodnością liczby elektronów (local_res_atom_non_h_electron_sum vs dict_atom_non_h_electron_sum;)
+
+```{r, echo=TRUE, Niezgodnosc}
+kable(dane %>%
+  mutate(blad = abs(dict_atom_non_h_count - local_res_atom_non_h_count)) %>%
+  select(res_name, blad) %>%
+  group_by(res_name) %>%
+  summarise(minimum = min(blad),
+            maximum = max(blad),
+            srednia = mean(blad),
+            warjancja = var(blad),
+            odch_stand = sd(blad)) %>%
+  arrange(desc(warjancja)) %>%
+  slice(1:10))
+
+
+```
